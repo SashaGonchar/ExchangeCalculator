@@ -2,16 +2,26 @@ import {useEffect, useState} from "react";
 import "./index.css";
 
 export default function App() {
-    const [amount, setAmount] = useState('100');
     const [availableCurrency, setAvailableCurrency] = useState([]);
-    const [fromCurrency, setFromCurrency] = useState('USD');
-    const [toCurrency, setToCurrency] = useState('EUR');
-    const [outputAmount, setOutputAmount] = useState(
+    const [amount, setAmount] = useState(100);
+    const [outputFromAmount, setOutputFromAmount] = useState(
         null);
-    const [displayedDots, setDisplayedDots] = useState(0)
+    const [outputToAmount, setOutputToAmount] = useState(
+        null);
+    const [fromCurrency, setFromCurrency] = useState('USD');
+    const [outputFromCurrency, setOutputFromCurrency] = useState('USD');
+    const [toCurrency, setToCurrency] = useState('EUR');
+    const [outputToCurrency, setOutputToCurrency] = useState('EUR');
+    const [displayedDots, setDisplayedDots] = useState(0);
+    const [click, setClick] = useState(true)
 
-    const handleChange = (e) => {
-        setAmount(e.target.value);
+    const handleAmountChange = (e) => {
+        if(Number(e.target.value) < 0){
+            setAmount(0);
+        }
+        else if (Number(e.target.value) >= 0 )
+        {setAmount(Number(e.target.value));}
+
     }
 
     const handleSelectedCurrency = (e) => {
@@ -26,14 +36,17 @@ export default function App() {
     useEffect(() => {
         const controller = new AbortController();
         const signal = controller.signal;
-        setOutputAmount(null);
+        setOutputToAmount(null);
 
         async function getData() {
             try {
                 const res = await fetch(`https://api.frankfurter.app/latest?amount=${amount}&from=${fromCurrency}&to=${toCurrency}`, {signal});
                 if (!res.ok) throw new Error('Network response was not ok');
                 const data = await res.json();
-                setOutputAmount(data);
+                setOutputFromAmount(amount);
+                setOutputFromCurrency(fromCurrency);
+                setOutputToAmount(data);
+                setOutputToCurrency(toCurrency);
             } catch (err) {
                 if (err.name !== 'AbortError') {
                     console.error('Ошибка при получении данных:', err);
@@ -42,10 +55,13 @@ export default function App() {
         }
 
         const fetchData = async () => {
-            if (fromCurrency !== toCurrency) {
+            if (fromCurrency !== toCurrency && amount > 0) {
                 await getData();
             } else {
-                setOutputAmount({ rates: { [toCurrency]: amount } });
+                setOutputFromAmount(amount);
+                setOutputFromCurrency(fromCurrency);
+                setOutputToAmount({ rates: { [toCurrency]: amount } });
+                setOutputToCurrency(toCurrency);
             }
         };
 
@@ -54,7 +70,7 @@ export default function App() {
         return () => {
             controller.abort();
         };
-    }, [amount, fromCurrency, toCurrency]);
+    }, [click]);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -78,25 +94,39 @@ export default function App() {
         return () => {
             controller.abort();
         };
-    }, [outputAmount]);
+    }, []);
 
 
     useEffect(() => {
-        if (!outputAmount) {
+        if (!outputToAmount) {
             const interval = setInterval(() => {
                 setDisplayedDots((prev) => (prev + 1) % 4);
             }, 100);
 
             return () => clearInterval(interval);
         }
-    }, [outputAmount]);
-
+    }, [outputToAmount]);
 
     const currencyOptions = availableCurrency?.map((currency) => (
         <option key={currency} value={currency}>
             {currency}
         </option>
     ));
+
+    const handleClick = () => {
+        setClick(!click)
+    }
+
+
+    useEffect(() => {
+        const timeout = setTimeout(() => {
+            handleClick()
+        }, 1500);
+
+        return () => {
+            clearTimeout(timeout);
+        };
+    }, [amount, fromCurrency, toCurrency]);
 
 
     return (
@@ -107,8 +137,8 @@ export default function App() {
                 <p className="error"></p>
 
                 <div className="input-group">
-                    <input type="number" placeholder="Amount" className="input-field" value={amount}
-                           onChange={handleChange}/>
+                    <input type="number" min={0} placeholder="Amount" className="input-field" value={amount}
+                           onChange={handleAmountChange}/>
                     <select className="dropdown" name="from" value={fromCurrency} onChange={handleSelectedCurrency}>
                         {currencyOptions}
                     </select>
@@ -117,16 +147,15 @@ export default function App() {
                         {currencyOptions}
                     </select>
                 </div>
-                <button className="convert-button">Convert</button>
+                <button className="convert-button" onClick={handleClick}>Convert</button>
                 <div className={"wrapper"}>
-                    {!outputAmount && (
-
+                    {!outputToAmount && (
                         <p className="loading">Converting{".".repeat(displayedDots)}</p>
                     )}
 
-                    {outputAmount && (
+                    {outputToAmount && (
                         <p className="result">
-                            {amount} {fromCurrency} = {outputAmount.rates[toCurrency]} {toCurrency}
+                            {outputFromAmount} {outputFromCurrency} = {outputToAmount.rates[outputToCurrency]} {outputToCurrency}
                         </p>
                     )}
                 </div>
